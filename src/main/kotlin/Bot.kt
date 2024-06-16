@@ -1,32 +1,35 @@
 package com.blum.bot
 
 import kotlinx.coroutines.delay
+import org.slf4j.LoggerFactory
 import kotlin.random.Random
 
-class Bot(private val webClient: WebClient) {
+class Bot(private val name: String, private val webClient: WebClient) {
+    private val logger = LoggerFactory.getLogger(this.javaClass)
+
     suspend fun start() {
         while (true) {
             try {
                 webClient.refreshAuthToken()
                 var balance = webClient.getUserBalance()
-                println("Current balance: ${balance.availableBalance} | Available plays: ${balance.playPasses}")
+                log("Current balance: ${balance.availableBalance} | Available plays: ${balance.playPasses}")
                 if (balance.farming != null && balance.farming!!.endTime > System.currentTimeMillis()) {
-                    println("Current farming time to end: ${(balance.farming!!.endTime - System.currentTimeMillis()) / 1000}s")
+                    log("Current farming time to end: ${(balance.farming!!.endTime - System.currentTimeMillis()) / 1000}s")
                 } else {
-                    println("No current farming")
+                    log("No current farming")
                 }
                 var preferredSleepTime = 0L
                 if (balance.farming != null) {
                     if (balance.farming!!.endTime < System.currentTimeMillis()) {
                         val farmingReward = balance.farming!!.balance
                         balance = webClient.claimReward()
-                        println("Farming reward claimed | Current balance: ${balance.availableBalance} (+$farmingReward)")
+                        log("Farming reward claimed | Current balance: ${balance.availableBalance} (+$farmingReward)")
                     } else {
                         preferredSleepTime = balance.farming!!.endTime - System.currentTimeMillis()
                     }
                 } else {
                     val farming = webClient.startFarming()
-                    println("Farming started, will be end after ${(farming.endTime - System.currentTimeMillis()) / 1000}s")
+                    log("Farming started, will be end after ${(farming.endTime - System.currentTimeMillis()) / 1000}s")
                 }
 
                 if (balance.playPasses > 0) {
@@ -35,10 +38,10 @@ class Bot(private val webClient: WebClient) {
                     }
                 }
 
-                println("Sleeping for ${preferredSleepTime / 1000} s")
+                log("Sleeping for ${preferredSleepTime / 1000} s")
                 delay(preferredSleepTime)
             } catch (e: Exception) {
-                println("Error: ${e.message}")
+                log("Error: ${e.message}")
                 delay(5000)
             }
         }
@@ -47,17 +50,22 @@ class Bot(private val webClient: WebClient) {
 
     private suspend fun doGame(): Boolean {
         val gameId = webClient.startGame()
-        println("Game started with id: $gameId")
+        log("Game started with id: $gameId")
         delay(1000 * 31)
 
-        val points = Random.nextInt(240, 270)
+        val points = Random.nextInt(250, 300)
         val finished = webClient.finishGame(gameId, points)
         if (finished) {
-            println("Game finished with result: $points")
+            val balance = webClient.getUserBalance()
+            log("Game finished with result: $points | Current balance: ${balance.availableBalance}")
             return true
         } else {
-            println("Game finished with error")
+            log("Game finished with error")
             return false
         }
+    }
+
+    private fun log(text: String) {
+        logger.info("[$name] $text")
     }
 }

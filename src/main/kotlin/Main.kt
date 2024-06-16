@@ -20,7 +20,7 @@ fun main(args: Array<String>) = runBlocking {
             clientsManager.clients.forEach { client ->
                 launch {
                     println("Launch client `${client.name}`")
-                    Bot(WebClient(client.refreshToken, clientsManager)).start()
+                    Bot(client.name, WebClient(client.refreshToken, clientsManager)).start()
                 }
             }
         }.join()
