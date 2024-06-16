@@ -6,7 +6,7 @@ import java.net.URL
 fun io.ktor.http.HttpMessageBuilder.createHeaders(url: URL, content: String? = null) {
     headers {
         append("Accept", "application/json, text/plain, */*")
-        append("Accept-Encoding", "gzip, deflate, br")
+        append("Accept-Encoding", "gzip, deflate")
         append("Accept-Language", "en-GB,en;q=0.9")
         append("Connection", "keep-alive")
         if (content != null) {

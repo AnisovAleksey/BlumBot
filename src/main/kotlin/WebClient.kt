@@ -1,14 +1,14 @@
 package com.blum.bot
 
 import com.blum.bot.requests.AuthRefreshRequest
-import com.blum.bot.responses.AuthRefreshResponse
-import com.blum.bot.responses.StartFarmingResponse
-import com.blum.bot.responses.UserBalanceResponse
+import com.blum.bot.responses.*
 import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.engine.cio.*
+import io.ktor.client.plugins.compression.*
 import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.client.request.*
+import io.ktor.client.statement.*
 import io.ktor.serialization.kotlinx.json.*
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.*
@@ -22,6 +22,10 @@ class WebClient(private var refreshToken: String, private val clientsManager: Cl
     private val client = HttpClient(CIO) {
         install(ContentNegotiation) {
             json(json = jsonParser)
+        }
+        install(ContentEncoding) {
+            deflate(1.0F)
+            gzip(0.9F)
         }
     }
 
@@ -89,5 +93,39 @@ class WebClient(private var refreshToken: String, private val clientsManager: Cl
         }.body<String>()
 
         return response == "OK"
+    }
+
+    suspend fun getTasks(): List<TaskResponse> {
+        val url = URL("https://game-domain.blum.codes/api/v1/tasks")
+        return client.get(url) {
+            createHeaders(url = url)
+            headers { append("Authorization", "Bearer $accessToken") }
+        }.body()
+    }
+
+    suspend fun startTask(taskId: String): Boolean {
+        val url = URL("https://game-domain.blum.codes/api/v1/tasks/$taskId/start")
+        val response = client.post(url) {
+            createHeaders(url = url)
+            headers { append("Authorization", "Bearer $accessToken") }
+        }.bodyAsText()
+
+        try {
+            val task = jsonParser.decodeFromString<TaskResponse>(response)
+            return task.status == TaskStatus.STARTED
+        } catch (e: Exception) {
+            return jsonParser.decodeFromString<JsonElement>(response)
+                .jsonObject["message"]
+                ?.let { it.jsonPrimitive.content.equals("Task is already started", ignoreCase=true) } ?: false
+        }
+    }
+
+    suspend fun claimTaskReward(taskId: String): Boolean {
+        val url = URL("https://game-domain.blum.codes/api/v1/tasks/$taskId/claim")
+        val task = client.post(url) {
+            createHeaders(url = url)
+            headers { append("Authorization", "Bearer $accessToken") }
+        }.body<TaskResponse>()
+        return task.status == TaskStatus.FINISHED
     }
 }
