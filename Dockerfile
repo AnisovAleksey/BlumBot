@@ -1,13 +1,7 @@
-FROM amazoncorretto:17-alpine
+FROM amazoncorretto:8-alpine3.19-jre
 
-COPY . build/
+COPY build/install/BlumBot BlumBot
 
-RUN cd build && \
-    ./gradlew installDist && \
-    mv build/install/BlumBot /BlumBot && \
-    cd .. && \
-    rm -rf build
-
-WORKDIR /BlumBot
+WORKDIR BlumBot
 
 CMD ["bin/BlumBot", "-a", "1"]%
