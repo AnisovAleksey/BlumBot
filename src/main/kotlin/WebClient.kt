@@ -76,7 +76,7 @@ class WebClient(private var refreshToken: String, private val clientsManager: Cl
             headers { append("Authorization", "Bearer $accessToken") }
         }.body<JsonElement>()
 
-        return response.jsonObject["gameId"].toString()
+        return response.jsonObject["gameId"]!!.jsonPrimitive.content
     }
 
     suspend fun finishGame(gameId: String, points: Int): Boolean {
