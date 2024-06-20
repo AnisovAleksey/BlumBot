@@ -12,6 +12,7 @@ fun main(args: Array<String>) = runBlocking {
         println("Choice option:")
         println("1. Start bot")
         println("2. Register client")
+        println("3. Remove client")
         readln().toInt()
     }
 
@@ -25,6 +26,16 @@ fun main(args: Array<String>) = runBlocking {
             }
         }.join()
         2 -> ClientsManager().registerClient()
+        3 -> {
+            println("Enter client number to remove: ")
+            val clients = clientsManager.clients
+            for ((index, client) in clients.withIndex()) {
+                println("${index + 1}. ${client.name}")
+            }
+            readln().toInt().let { index ->
+                clientsManager.removeClient(clients[index - 1])
+            }
+        }
         else -> println("Unknown action")
     }
 }

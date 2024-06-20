@@ -21,8 +21,16 @@ class ClientsManager {
         }
 
     fun registerClient() {
-        println("Enter client name:")
-        val name = readln()
+        var name: String
+        while (true) {
+            println("Enter client name:")
+            name = readln()
+            if (clients.any { it.name == name }) {
+                println("Client with this name already exists")
+            } else {
+                break
+            }
+        }
         println("Enter refresh token:")
         val refreshToken = readln()
         val client = Client(name, refreshToken)
@@ -41,6 +49,11 @@ class ClientsManager {
             }
         }
 
+        saveClients(updatedClients)
+    }
+
+    fun removeClient(client: Client) {
+        val updatedClients = clients.filter { it.name != client.name }
         saveClients(updatedClients)
     }
 
