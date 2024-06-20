@@ -18,8 +18,8 @@ fun main(args: Array<String>) = runBlocking {
     when (action) {
         1 -> CoroutineScope(Dispatchers.IO).launch {
             clientsManager.clients.forEach { client ->
-                launch {
-                    println("Launch client `${client.name}`")
+                launch(context = Logger.threadLocal.asContextElement(Logger(client.name))) {
+                    Logger.log("Client starting")
                     Bot(client.name, WebClient(client.refreshToken, clientsManager)).start()
                 }
             }

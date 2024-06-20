@@ -5,7 +5,7 @@ plugins {
 }
 
 group = "com.blum.bot"
-version = "1.0"
+version = "1.1"
 
 val ktor_version: String by project
 

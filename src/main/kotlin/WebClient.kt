@@ -1,5 +1,7 @@
 package com.blum.bot
 
+import com.blum.bot.exceptions.RefreshTokenException
+import com.blum.bot.exceptions.RefreshTokenExpiredException
 import com.blum.bot.requests.AuthRefreshRequest
 import com.blum.bot.responses.*
 import io.ktor.client.*
@@ -9,10 +11,13 @@ import io.ktor.client.plugins.compression.*
 import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
+import io.ktor.serialization.*
 import io.ktor.serialization.kotlinx.json.*
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.*
 import java.net.URL
+import kotlin.io.encoding.Base64
+import kotlin.io.encoding.ExperimentalEncodingApi
 
 class WebClient(private var refreshToken: String, private val clientsManager: ClientsManager) {
     private val jsonParser = Json {
@@ -32,20 +37,30 @@ class WebClient(private var refreshToken: String, private val clientsManager: Cl
     private var accessToken: String? = null
 
     suspend fun refreshAuthToken() {
+        if (isTokenExpired(refreshToken)) {
+            throw RefreshTokenExpiredException()
+        }
+
         val url = URL("https://gateway.blum.codes/v1/auth/refresh")
         val body = jsonParser.encodeToString(AuthRefreshRequest(refresh = refreshToken))
         val response = client.post(url) {
             createHeaders(url=url, content=body)
             setBody(body)
-        }.body<AuthRefreshResponse>()
+        }
 
-        accessToken = response.access
-        clientsManager.updateRefreshToken(
-            oldRefreshToken = refreshToken,
-            newRefreshToken = response.refresh
-        )
-        refreshToken = response.refresh
-
+        try {
+            val authRefreshResponse = response.body<AuthRefreshResponse>()
+            accessToken = authRefreshResponse.access
+            clientsManager.updateRefreshToken(
+                oldRefreshToken = refreshToken,
+                newRefreshToken = authRefreshResponse.refresh
+            )
+            println("new refresh token: $refreshToken")
+            refreshToken = authRefreshResponse.refresh
+        } catch (e: JsonConvertException) {
+            Logger.error("Failed to refresh auth token: ${response.bodyAsText()}", e)
+            throw RefreshTokenException()
+        }
     }
 
     suspend fun getUserBalance(): UserBalanceResponse {
@@ -128,4 +143,50 @@ class WebClient(private var refreshToken: String, private val clientsManager: Cl
         }.body<TaskResponse>()
         return task.status == TaskStatus.FINISHED
     }
+
+    suspend fun checkDailyReward(): Boolean {
+        val url = URL("https://game-domain.blum.codes/api/v1/daily-reward?offset=-420")
+        val response = client.get(url) {
+            createHeaders(url = url)
+            headers { append("Authorization", "Bearer $accessToken") }
+        }
+
+        return response.status.value == 200
+    }
+
+    suspend fun claimDailyReward(): Boolean {
+        val url = URL("https://game-domain.blum.codes/api/v1/daily-reward?offset=-420")
+        val response = client.post(url) {
+            createHeaders(url = url)
+            headers { append("Authorization", "Bearer $accessToken") }
+        }
+
+        return response.status.value == 200
+                && response.bodyAsText().equals("OK", ignoreCase = true)
+    }
+}
+
+data class JwtPayload(val exp: Long)
+
+@OptIn(ExperimentalEncodingApi::class)
+fun decodeBase64(base64: String): String {
+    return String(Base64.decode(base64))
+}
+
+fun parseJwtPayload(token: String): JwtPayload? {
+    val parts = token.split(".")
+    if (parts.size != 3) return null
+
+    val payloadJson = decodeBase64(parts[1])
+    val regex = """"exp"\s*:\s*(\d+)""".toRegex()
+    val matchResult = regex.find(payloadJson) ?: return null
+    val exp = matchResult.groupValues[1].toLongOrNull() ?: return null
+
+    return JwtPayload(exp)
+}
+
+fun isTokenExpired(token: String): Boolean {
+    val payload = parseJwtPayload(token) ?: return true
+    val currentTime = System.currentTimeMillis() / 1000
+    return currentTime > payload.exp
 }
