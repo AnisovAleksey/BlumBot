@@ -6,7 +6,7 @@
 ✅ Automatically completing available tasks
 
 ## Quick Start
-1. Install (docker)[https://docs.docker.com/engine/install/]
+1. Install [docker](https://docs.docker.com/engine/install/)
 2. Create clients.json file that will store your clients
 3. Use following command to register clients and add them to clients.json file
 ```bash
