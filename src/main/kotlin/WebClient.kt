@@ -55,7 +55,6 @@ class WebClient(private var refreshToken: String, private val clientsManager: Cl
                 oldRefreshToken = refreshToken,
                 newRefreshToken = authRefreshResponse.refresh
             )
-            println("new refresh token: $refreshToken")
             refreshToken = authRefreshResponse.refresh
         } catch (e: JsonConvertException) {
             Logger.error("Failed to refresh auth token: ${response.bodyAsText()}", e)
