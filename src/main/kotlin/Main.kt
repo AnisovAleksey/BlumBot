@@ -25,7 +25,7 @@ fun main(args: Array<String>) = runBlocking {
                 }
             }
         }.join()
-        2 -> ClientsManager().registerClient()
+        2 -> clientsManager.registerClient()
         3 -> {
             println("Enter client number to remove: ")
             val clients = clientsManager.clients

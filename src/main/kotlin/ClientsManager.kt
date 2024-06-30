@@ -1,31 +1,37 @@
 package com.blum.bot
 
 import com.blum.bot.entity.Client
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import java.io.File
 
 class ClientsManager {
     private val clientsFile = File("clients.json")
+    private val mutex = Mutex()
+
+    private var innerClients: List<Client> = clientsFile.let { file ->
+        if (!file.exists()) {
+            return@let emptyList()
+        }
+        return@let Json.decodeFromString(file.readText())
+    }
 
     val clients: List<Client>
-        get() = clientsFile.let { file ->
-            if (!file.exists()) {
-                return@let emptyList()
-            }
-            try {
-                return@let Json.decodeFromString(file.readText())
-            } catch (e: Exception) {
-                return@let emptyList()
+        get() = runBlocking {
+            mutex.withLock {
+                innerClients
             }
         }
 
-    fun registerClient() {
+    suspend fun registerClient() = mutex.withLock {
         var name: String
         while (true) {
             println("Enter client name:")
             name = readln()
-            if (clients.any { it.name == name }) {
+            if (innerClients.any { it.name == name }) {
                 println("Client with this name already exists")
             } else {
                 break
@@ -35,13 +41,13 @@ class ClientsManager {
         val refreshToken = readln()
         val client = Client(name, refreshToken)
 
-        saveClients(clients + client)
+        saveClients(innerClients + client)
 
         println("Client successfully registered")
     }
 
-    fun updateRefreshToken(oldRefreshToken: String, newRefreshToken: String) {
-        val updatedClients = clients.map { client ->
+    suspend fun updateRefreshToken(oldRefreshToken: String, newRefreshToken: String) = mutex.withLock {
+        val updatedClients = innerClients.map { client ->
             if (client.refreshToken == oldRefreshToken) {
                 client.copy(refreshToken = newRefreshToken)
             } else {
@@ -52,13 +58,14 @@ class ClientsManager {
         saveClients(updatedClients)
     }
 
-    fun removeClient(client: Client) {
-        val updatedClients = clients.filter { it.name != client.name }
+    suspend fun removeClient(client: Client) = mutex.withLock {
+        val updatedClients = innerClients.filter { it.name != client.name }
         saveClients(updatedClients)
     }
 
 
     private fun saveClients(clients: List<Client>) {
+        innerClients = clients
         clientsFile.writeText(Json.encodeToString(clients))
     }
 }
